@@ -1,0 +1,50 @@
+# Local Docker run config — no TLS, HTTP only.
+#
+# Use this to smoke-test the container quickly:
+#
+#   docker run -d --name i3xua -p 8080:8080 \
+#     -v "$(pwd)/config.docker.yaml:/config/config.yaml:ro" \
+#     i3xua:local
+#   curl http://127.0.0.1:8080/healthz
+#
+# Notes vs. the production config.yaml:
+#   - TLS is intentionally off. The Dockerfile HEALTHCHECK probes HTTP
+#     /healthz, and no certs/ dir is mounted here. Terminate TLS at a
+#     reverse proxy, or use config.yaml + a mounted /certs for production.
+#   - The endpoint uses host.docker.internal so the container can reach an
+#     OPC UA server running on your host machine (localhost inside the
+#     container is the container itself, not your Mac). The wrapper serves
+#     /healthz regardless of whether the endpoint is reachable — it just
+#     retries under the reconnect backoff.
+server:
+  host: 0.0.0.0
+  port: 8080
+  versions: [v0, v1]
+  auth:
+    mode: none
+
+logging:
+  level: INFO
+  format: json
+
+registry:
+  history_ring_size: 1000
+  subscription_ring_size: 10000
+  rebrowse_interval_seconds: 300
+
+connections:
+  - name: ua-ref-server
+    endpoint: opc.tcp://host.docker.internal:62541/Quickstarts/ReferenceServer
+    channel:
+      mode: "None"
+      policy: "None"
+    user:
+      type: anonymous
+    namespace_allowlist: []
+    reconnect:
+      backoff_ms: [1000, 2000, 4000, 8000, 16000, 32000, 60000]
+    browse_variable_properties: true
+    max_parents_per_batch: 1000
+    max_children_per_batch: 50000
+    default_publishing_interval_ms: 1000
+    default_sampling_interval_ms: 500
